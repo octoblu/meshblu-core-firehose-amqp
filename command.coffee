@@ -1,5 +1,5 @@
 _      = require 'lodash'
-Worker = require './src/worker'
+FirehoseWorker = require './src/firehose-worker'
 
 class Command
   constructor: ->
@@ -19,7 +19,7 @@ class Command
     @panic new Error('Missing required environment variable: AMQP_URI') if _.isEmpty @options.amqpUri
     @panic new Error('Missing required environment variable: REDIS_URI') if _.isEmpty @options.redisUri
 
-    worker = new Worker @options
+    worker = new FirehoseWorker @options
 
     console.log 'AMQP firehose worker is working'
 
