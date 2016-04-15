@@ -1,6 +1,6 @@
 {
   "name": "meshblu-core-worker-firehose-amqp",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Meshblu AMQP worker",
   "main": "command.js",
   "scripts": {
