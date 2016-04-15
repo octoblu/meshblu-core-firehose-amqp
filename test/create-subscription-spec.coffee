@@ -7,9 +7,9 @@ redis          = require 'ioredis'
 
 describe 'create subscription', ->
   beforeEach (done) ->
-    @redisClient = new RedisNS 'messages', redis.createClient()
+    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient()
     @redisClient.on 'ready', =>
-      @redisClient.del 'subscriptions:amqp', done
+      @redisClient.del 'subscriptions', done
 
   beforeEach ->
     @worker = new FirehoseWorker
@@ -20,7 +20,8 @@ describe 'create subscription', ->
       jobLogSampleRate: 0
       maxConnections: 10
       redisUri: 'redis://localhost:6379'
-      namespace: 'messages'
+      namespace: 'test:firehose:amqp'
+      hydrantNamespace: 'messages'
 
     @worker.run (error) =>
       throw error if error?
@@ -37,7 +38,7 @@ describe 'create subscription', ->
   it 'should insert the uuid into the subscription queue in redis', (done) ->
     @members = []
     checkList = (callback) =>
-      @redisClient.lrange 'subscriptions:amqp', 0, -1, (error, @members) =>
+      @redisClient.lrange 'subscriptions', 0, -1, (error, @members) =>
         return callback error if error?
         callback()
 

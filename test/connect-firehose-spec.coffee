@@ -5,11 +5,15 @@ MeshbluAmqp    = require 'meshblu-amqp'
 RedisNS        = require '@octoblu/redis-ns'
 redis          = require 'ioredis'
 
-describe 'delete subscription', ->
+describe 'connect firehose subscription', ->
   beforeEach (done) ->
     @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient()
     @redisClient.on 'ready', =>
       @redisClient.del 'subscriptions', done
+
+  beforeEach (done) ->
+    @redisHydrantClient = new RedisNS 'messages', redis.createClient()
+    @redisHydrantClient.on 'ready', done
 
   beforeEach ->
     @worker = new FirehoseWorker
@@ -36,22 +40,35 @@ describe 'delete subscription', ->
       @client.connectFirehose done
 
   beforeEach (done) ->
+    message =
+      metadata:
+        route: [{toUuid: 'a', fromUuid: 'b', type: 'message.sent'}]
+      rawData: '{"foo":"bar"}'
+
     @members = []
+    @subscriptionExists = false
     checkList = (callback) =>
       @redisClient.lrange 'subscriptions', 0, -1, (error, @members) =>
         return callback error if error?
         callback()
+
+    @client.once 'message', (@message) =>
+      done()
+
     async.until (=> _.includes @members, @client.firehoseQueueName), checkList, (error) =>
       return done error if error?
-      @client.disconnectFirehose done
+      async.until (=> @worker.subscriptions?[@client.firehoseQueueName]?), ((cb) => setTimeout(cb, 100)), (error) =>
+        return done error if error?
+        @redisHydrantClient.publish 'some-uuid', JSON.stringify(message), (error, published) =>
+          return done error if error?
+          return done(new Error 'failed to publish') if published == 0
 
-  it 'should remove the uuid from the subscription queue in redis', (done) ->
-    checkList = (callback) =>
-      @redisClient.lrange 'subscriptions', 0, -1, (error, @members) =>
-        return callback error if error?
-        callback()
-
-    async.until (=> !_.includes @members, @client.firehoseQueueName), checkList, (error) =>
-      return done error if error?
-      expect(@members).to.not.include @client.firehoseQueueName
-      done()
+  it 'should emit a message', ->
+    expectedMetadata =
+      route: [
+        fromUuid: 'b'
+        toUuid: 'a'
+        type: 'message.sent'
+      ]
+    expect(@message.metadata).to.deep.equal expectedMetadata
+    expect(@message.rawData).to.equal '{"foo":"bar"}'
