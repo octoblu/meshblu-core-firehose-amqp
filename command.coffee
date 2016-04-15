@@ -15,7 +15,7 @@ class Command
     process.exit 1
 
   run: =>
-    @panic new Error('Missing required environment variable: ALIAS_SERVER_URI') unless @serverOptions.aliasServerUri? # allowed to be empty
+    @panic new Error('Missing required environment variable: ALIAS_SERVER_URI') unless @options.aliasServerUri? # allowed to be empty
     @panic new Error('Missing required environment variable: AMQP_URI') if _.isEmpty @options.amqpUri
     @panic new Error('Missing required environment variable: REDIS_URI') if _.isEmpty @options.redisUri
 
