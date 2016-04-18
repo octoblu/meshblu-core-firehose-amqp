@@ -83,6 +83,8 @@ class FirehoseWorker
       return callback() unless subscription?
 
       @_acquireLock subscription, (error) =>
+        return callback error if error?
+        setTimeout callback, 100
 
   _acquireLock: (subscription, callback) =>
     @redlock.lock "locks:#{subscription}", 60*1000, (error, lock) =>
@@ -134,6 +136,7 @@ class FirehoseWorker
   _onMessage: (message) =>
     {replyTo} = message.properties
     {jobType} = message.applicationProperties
+
     if jobType == 'DisconnectFirehose'
       return @redisClient.lrem 'subscriptions', 0, replyTo, (error) =>
         throw error if error?
