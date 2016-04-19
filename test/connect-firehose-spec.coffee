@@ -71,4 +71,4 @@ describe 'connect firehose subscription', ->
         type: 'message.sent'
       ]
     expect(@message.metadata).to.deep.equal expectedMetadata
-    expect(@message.rawData).to.equal '{"foo":"bar"}'
+    expect(@message.data).to.deep.equal {"foo":"bar"}

@@ -47,6 +47,8 @@ class FirehoseWorker
     @client = new Client options
     @client.connect @amqpUri
       .then =>
+        @client.once 'connection:closed', =>
+          throw new Error 'connection to amqp server lost'
         Promise.all [
           @client.createSender()
           @client.createReceiver('meshblu.firehose.request')
