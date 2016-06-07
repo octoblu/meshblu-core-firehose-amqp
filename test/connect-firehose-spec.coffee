@@ -7,12 +7,12 @@ redis          = require 'ioredis'
 
 describe 'connect firehose subscription', ->
   beforeEach (done) ->
-    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient()
+    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient(dropBufferSupport: true)
     @redisClient.on 'ready', =>
       @redisClient.del 'subscriptions', done
 
   beforeEach (done) ->
-    @redisHydrantClient = new RedisNS 'messages', redis.createClient()
+    @redisHydrantClient = new RedisNS 'messages', redis.createClient(dropBufferSupport: true)
     @redisHydrantClient.on 'ready', done
 
   beforeEach ->

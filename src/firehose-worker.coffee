@@ -11,17 +11,25 @@ async               = require 'async'
 
 class FirehoseWorker
   constructor: (options)->
-    {@aliasServerUri, @amqpUri, @maxConnections, @redisUri, @namespace, @hydrantNamespace} = options
+    {
+      @aliasServerUri
+      @amqpUri
+      @maxConnections
+      @redisUri
+      @firehoseRedisUri
+      @namespace
+      @hydrantNamespace
+    } = options
     throw new Error('FirehoseWorker: @hydrantNamespace is required') unless @hydrantNamespace?
     throw new Error('FirehoseWorker: @namespace is required') unless @namespace?
 
   connect: (callback) =>
     @subscriptions = {}
     @subscriptionLookup = {}
-    @redisClient = new RedisNS @namespace, redis.createClient(@redisUri)
-    @queueClient = new RedisNS @namespace, redis.createClient(@redisUri)
-    hydrantClient = new RedisNS @hydrantNamespace, redis.createClient(@redisUri)
-    uuidAliasClient = new RedisNS 'uuid-alias', redis.createClient(@redisUri)
+    @redisClient = new RedisNS @namespace, redis.createClient(@redisUri, dropBufferSupport: true)
+    @queueClient = new RedisNS @namespace, redis.createClient(@redisUri, dropBufferSupport: true)
+    hydrantClient = new RedisNS @hydrantNamespace, redis.createClient(@firehoseRedisUri, dropBufferSupport: true)
+    uuidAliasClient = new RedisNS 'uuid-alias', redis.createClient(@redisUri, dropBufferSupport: true)
 
     redlockOptions =
       retryCount: 100

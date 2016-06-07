@@ -7,6 +7,7 @@ class Command
       amqpUri          : process.env.AMQP_URI
       aliasServerUri   : process.env.ALIAS_SERVER_URI
       redisUri         : process.env.REDIS_URI
+      firehoseRedisUri : process.env.FIREHOSE_REDIS_URI
       namespace        : process.env.NAMESPACE || 'firehose:amqp'
       hydrantNamespace : process.env.HYDRANT_NAMESPACE || 'messages'
 
@@ -18,6 +19,7 @@ class Command
     @panic new Error('Missing required environment variable: ALIAS_SERVER_URI') unless @options.aliasServerUri? # allowed to be empty
     @panic new Error('Missing required environment variable: AMQP_URI') if _.isEmpty @options.amqpUri
     @panic new Error('Missing required environment variable: REDIS_URI') if _.isEmpty @options.redisUri
+    @panic new Error('Missing required environment variable: FIREHOSE_REDIS_URI') if _.isEmpty @options.firehoseRedisUri
 
     worker = new FirehoseWorker @options
 

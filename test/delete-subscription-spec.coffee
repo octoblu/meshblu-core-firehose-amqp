@@ -7,7 +7,7 @@ redis          = require 'ioredis'
 
 describe 'delete subscription', ->
   beforeEach (done) ->
-    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient()
+    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient(dropBufferSupport: true)
     @redisClient.on 'ready', =>
       @redisClient.del 'subscriptions', done
 
