@@ -8,9 +8,10 @@ MultiHydrantFactory = require 'meshblu-core-manager-hydrant/multi'
 UuidAliasResolver   = require 'meshblu-uuid-alias-resolver'
 Redlock             = require 'redlock'
 async               = require 'async'
+UUID                = require 'uuid'
 
 class FirehoseWorker
-  constructor: (options)->
+  constructor: (options={}, dependencies={}) ->
     {
       @aliasServerUri
       @amqpUri
@@ -22,6 +23,7 @@ class FirehoseWorker
     } = options
     throw new Error('FirehoseWorker: @hydrantNamespace is required') unless @hydrantNamespace?
     throw new Error('FirehoseWorker: @namespace is required') unless @namespace?
+    @UUID = dependencies.UUID ? UUID
 
   connect: (callback) =>
     @subscriptions = {}
@@ -82,6 +84,39 @@ class FirehoseWorker
       .then callback
       .catch callback
 
+  add: (subscriptionObj, callback) =>
+    {
+      subscription
+    } = subscriptionObj
+
+    debug 'add', subscription
+
+    nonce = @UUID.v4()
+    subscriptionObj.nonce = nonce
+
+    tasks = [
+      async.apply @redisClient.set, "data:#{subscription}", JSON.stringify(subscriptionObj)
+      async.apply @redisClient.lrem, 'subscriptions', 0, subscription
+      async.apply @redisClient.rpush, 'subscriptions', subscription
+    ]
+
+    async.series tasks, callback
+
+  remove: (subscriptionObj, callback) =>
+    {
+      subscription
+    } = subscriptionObj
+
+    debug 'remove', subscription
+
+    tasks = [
+      async.apply @redisClient.del, "data:#{subscription}"
+      async.apply @redisClient.lrem, 'subscriptions', 0, subscription
+      async.apply @_unclaimSubscription, subscriptionObj.subscription
+    ]
+
+    async.series tasks, callback
+
   _processQueueForever: =>
     async.forever @_processQueue, (error) =>
       throw error if error? && !@stopped
@@ -98,11 +133,12 @@ class FirehoseWorker
 
   _acquireLock: (subscription, callback) =>
     @redlock.lock "locks:#{subscription}", 60*1000, (error, lock) =>
-      return callback error if error?
+      return callback() if error?
       return callback() unless lock?
       @_handleSubscription subscription, (error) =>
-        lock.unlock()
-        callback error
+        lock.unlock (lockError) =>
+          return callback lockError if lockError?
+          callback error
 
   _handleSubscription: (subscription, callback) =>
     @_checkClaimableSubscription subscription, (error, claimable) =>
@@ -110,60 +146,101 @@ class FirehoseWorker
       return callback() unless claimable
       async.series [
         async.apply @_claimSubscription, subscription
-        async.apply @_subscribeHydrant, subscription
-        async.apply @_updateSubscriptions, subscription
+        async.apply @_createSubscription, subscription
+        async.apply @_destroySubscription, subscription
       ], callback
 
   _checkClaimableSubscription: (subscription, callback) =>
-    @redisClient.exists subscription, (error, exists) =>
+    @redisClient.exists "claim:#{subscription}", (error, exists) =>
       return callback error if error?
-      claimable = @_isSubscribed(subscription) or !exists
-      return callback null, claimable
+      return callback null, true if exists == 0
+      return callback null, @_isSubscribed(subscription)
 
   _claimSubscription: (subscription, callback) =>
-    @redisClient.setex subscription, Date.now(), 60, (error) =>
+    @redisClient.setex "claim:#{subscription}", 60, Date.now(), callback
+
+  _unclaimSubscription: (subscription, callback) =>
+    debug '_unclaimSubscription', subscription
+
+    delete @subscriptions[subscription]
+    @_unsubscribeHydrant subscription, (error) =>
       return callback error if error?
-      callback()
+      @redisClient.del "claim:#{subscription}", callback
+
+  _getSubscription: (subscription, callback) =>
+    @redisClient.get "data:#{subscription}", (error, data) =>
+      return callback error if error?
+      try
+        subscriptionObj = JSON.parse(data)
+      catch error
+        return callback error
+
+      callback null, subscriptionObj
+
+  _checkNonce: (subscriptionObj, callback) =>
+    return callback null, false
+
+  _createSubscription: (subscription, callback) =>
+    return callback() if @_isSubscribed subscription
+    @_getSubscription subscription, (error, subscriptionObj) =>
+      return callback error if error?
+      return callback 'Not Found' unless subscriptionObj?
+      @_subscribeHydrant subscription, (error) =>
+        return callback error if error?
+        @subscriptions[subscription] = subscriptionObj.nonce
+        callback()
+
+  _destroySubscription: (subscription, callback) =>
+    return callback() unless @_isSubscribed subscription
+    @_getSubscription subscription, (error, subscriptionObj) =>
+      return callback error if error?
+      return callback() if subscriptionObj?.nonce? && @subscriptions[subscription] == subscriptionObj?.nonce
+      @_unclaimSubscription subscription, (error) =>
+        return callback error if error?
+        delete @subscriptions[subscription]
+        callback()
+
+  _isSubscribed: (subscription) =>
+    @subscriptions[subscription]?
 
   _subscribeHydrant: (subscription, callback) =>
     return callback() if @_isSubscribed subscription
     uuid = _.first subscription.split /\./
     @hydrant.subscribe {uuid}, (error) =>
       return callback error if error?
+      @subscriptionLookup[uuid] ?= []
+      @subscriptionLookup[uuid].push subscription
       callback()
 
-  _updateSubscriptions: (subscription, callback) =>
-    return callback() if @_isSubscribed subscription
+  _unsubscribeHydrant: (subscription, callback) =>
     uuid = _.first subscription.split /\./
-    @subscriptionLookup[uuid] ?= []
-    @subscriptionLookup[uuid].push subscription
-    @subscriptions[subscription] = true
-    callback()
-
-  _isSubscribed: (subscription) =>
-    @subscriptions[subscription]?
+    @hydrant.unsubscribe {uuid}, (error) =>
+      return callback error if error?
+      _.pull @subscriptionLookup.uuid, subscription
+      callback()
 
   _onMessage: (message) =>
     {replyTo} = message.properties
     {jobType} = message.applicationProperties
 
     if jobType == 'DisconnectFirehose'
-      return @redisClient.lrem 'subscriptions', 0, replyTo, (error) =>
+      @remove subscription: replyTo, (error) =>
         throw error if error?
 
     if jobType == 'ConnectFirehose'
-      @redisClient.lrem 'subscriptions', 0, replyTo, (error) =>
+      @add subscription: replyTo, (error) =>
         throw error if error?
-        @redisClient.rpush 'subscriptions', replyTo, (error) =>
-          throw error if error?
 
   _onHydrantMessage: (channel, message) =>
+    { rawData } = message
+    rawData ?= {}
+
     _.each @subscriptionLookup[channel], (subject) =>
       options =
         properties:
           subject: subject
         applicationProperties: message.metadata
 
-      @sender.send message.rawData || {}, options
+      @sender.send rawData, options
 
 module.exports = FirehoseWorker

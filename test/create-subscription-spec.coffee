@@ -7,9 +7,13 @@ redis          = require 'ioredis'
 
 describe 'create subscription', ->
   beforeEach (done) ->
-    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient(dropBufferSupport: true)
+    rawClient = redis.createClient(dropBufferSupport: true)
+    @redisClient = new RedisNS 'test:firehose:amqp', rawClient
     @redisClient.on 'ready', =>
-      @redisClient.del 'subscriptions', done
+      @redisClient.keys '*', (error, keys) =>
+        return done error if error?
+        return done() if _.isEmpty keys
+        rawClient.del keys..., done
 
   beforeEach ->
     @worker = new FirehoseWorker

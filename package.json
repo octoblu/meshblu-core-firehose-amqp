@@ -1,6 +1,6 @@
 {
   "name": "meshblu-core-worker-firehose-amqp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Meshblu AMQP worker",
   "main": "command.js",
   "scripts": {
@@ -37,9 +37,10 @@
     "bluebird": "^3.3.5",
     "debug": "^2.2.0",
     "ioredis": "^2.0.1",
-    "meshblu-core-manager-hydrant": "^1.6.0",
+    "meshblu-core-manager-hydrant": "^1.7.0",
     "meshblu-uuid-alias-resolver": "^1.0.3",
-    "redlock": "^2.0.0"
+    "redlock": "^2.0.0",
+    "uuid": "^2.0.3"
   },
   "optionalDependencies": {
     "hiredis": "^0.4.1"

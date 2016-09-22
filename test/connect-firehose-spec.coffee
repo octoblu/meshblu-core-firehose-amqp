@@ -7,9 +7,13 @@ redis          = require 'ioredis'
 
 describe 'connect firehose subscription', ->
   beforeEach (done) ->
-    @redisClient = new RedisNS 'test:firehose:amqp', redis.createClient(dropBufferSupport: true)
+    rawClient = redis.createClient(dropBufferSupport: true)
+    @redisClient = new RedisNS 'test:firehose:amqp', rawClient
     @redisClient.on 'ready', =>
-      @redisClient.del 'subscriptions', done
+      @redisClient.keys '*', (error, keys) =>
+        return done error if error?
+        return done() if _.isEmpty keys
+        rawClient.del keys..., done
 
   beforeEach (done) ->
     @redisHydrantClient = new RedisNS 'messages', redis.createClient(dropBufferSupport: true)
@@ -40,6 +44,7 @@ describe 'connect firehose subscription', ->
       @client.connectFirehose done
 
   beforeEach (done) ->
+    doneTwice = _.after 2, done
     message =
       metadata:
         route: [{toUuid: 'a', fromUuid: 'b', type: 'message.sent'}]
@@ -53,7 +58,7 @@ describe 'connect firehose subscription', ->
         callback()
 
     @client.once 'message', (@message) =>
-      done()
+      doneTwice()
 
     async.until (=> _.includes @members, @client.firehoseQueueName), checkList, (error) =>
       return done error if error?
@@ -62,6 +67,7 @@ describe 'connect firehose subscription', ->
         @redisHydrantClient.publish 'some-uuid', JSON.stringify(message), (error, published) =>
           return done error if error?
           return done(new Error 'failed to publish') if published == 0
+          doneTwice()
 
   it 'should emit a message', ->
     expectedMetadata =
@@ -71,4 +77,4 @@ describe 'connect firehose subscription', ->
         type: 'message.sent'
       ]
     expect(@message.metadata).to.deep.equal expectedMetadata
-    expect(@message.data).to.deep.equal {"foo":"bar"}
+    expect(JSON.parse @message.rawData).to.deep.equal foo:"bar"
