@@ -19,7 +19,8 @@ before_script:
   - >-
     sudo rabbitmqctl set_permissions some-uuid
     '^(amq\.gen.*|amq\.default|^some-uuid.*)$' '.*' '.*'
-  - sleep 10
+script:
+  - echo "No tests"
 after_script:
   - codeclimate-test-reporter < coverage/lcov.info
 after_success:
