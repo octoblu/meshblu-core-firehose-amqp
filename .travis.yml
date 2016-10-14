@@ -1,24 +1,29 @@
 language: node_js
 node_js:
-- '5'
+  - '5'
 services:
-- redis
-- rabbitmq
+  - redis
+  - rabbitmq
 addons:
   code_climate:
     repo_token: 7432bf457b9f81f1287bba56af9eeea931d0af009d8d3d22e1b813a0b3c6f27d
 before_script:
-- npm install -g codeclimate-test-reporter
-- sudo rabbitmq-plugins enable rabbitmq_amqp1_0
-- sudo rabbitmqctl add_user meshblu judgementday
-- sudo rabbitmqctl set_permissions meshblu ".*" ".*" ".*"
-- sudo rabbitmqctl add_user some-uuid some-token
-- sudo rabbitmqctl set_permissions some-uuid '^(amq\.gen.*|amq\.default|^some-uuid.*)$' '.*' '.*'
-- sleep 10
+  - npm install -g codeclimate-test-reporter
+  - sudo rabbitmq-plugins enable rabbitmq_amqp1_0
+  - sudo rabbitmqctl add_user meshblu judgementday
+  - sudo rabbitmqctl set_permissions meshblu ".*" ".*" ".*"
+  - sudo rabbitmqctl add_user some-uuid some-token
+  - >-
+    sudo rabbitmqctl set_permissions some-uuid
+    '^(amq\.gen.*|amq\.default|^some-uuid.*)$' '.*' '.*'
+  - sleep 10
 after_script:
-- codeclimate-test-reporter < coverage/lcov.info
+  - codeclimate-test-reporter < coverage/lcov.info
 after_success:
-- npm run coverage
-- npm run mocha:json
-- bash <(curl -s https://codecov.io/bash)
-- bash <(curl -s https://codecov.octoblu.com/bash)
+  - npm run coverage
+  - 'npm run mocha:json'
+  - 'bash <(curl -s https://codecov.io/bash)'
+  - 'bash <(curl -s https://codecov.octoblu.com/bash)'
+notifications:
+  webhooks:
+    - 'https://beekeeper.octoblu.com/webhooks/travis:ci'
