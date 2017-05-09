@@ -6,7 +6,7 @@ RedisNS        = require '@octoblu/redis-ns'
 redis          = require 'ioredis'
 
 describe 'connect firehose subscription', ->
-  beforeEach (done) ->
+  beforeEach 'create redis connection', (done) ->
     rawClient = redis.createClient(dropBufferSupport: true)
     @redisClient = new RedisNS 'test:firehose:amqp', rawClient
     @redisClient.on 'ready', =>
@@ -15,11 +15,14 @@ describe 'connect firehose subscription', ->
         return done() if _.isEmpty keys
         rawClient.del keys..., done
 
-  beforeEach (done) ->
+    return # nothing
+
+  beforeEach 'hydrant', (done) ->
     @redisHydrantClient = new RedisNS 'messages', redis.createClient(dropBufferSupport: true)
     @redisHydrantClient.on 'ready', done
+    return # nothing
 
-  beforeEach ->
+  beforeEach 'run', ->
     @worker = new FirehoseWorker
       amqpUri: 'amqp://meshblu:judgementday@127.0.0.1'
       jobTimeoutSeconds: 1
@@ -36,14 +39,16 @@ describe 'connect firehose subscription', ->
 
   afterEach (done) ->
     @worker.stop done
+    return # nothing
 
-  beforeEach (done) ->
+  beforeEach 'setup amqp', (done) ->
     @client = new MeshbluAmqp uuid: 'some-uuid', token: 'some-token', hostname: 'localhost'
     @client.connect (error) =>
       return done error if error?
       @client.connectFirehose done
+    return # nothing
 
-  beforeEach (done) ->
+  beforeEach 'message', (done) ->
     doneTwice = _.after 2, done
     message =
       metadata:

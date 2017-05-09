@@ -76,6 +76,7 @@ class FirehoseWorker
     @connect (error) =>
       return callback error if error?
       @_processQueueForever()
+    return # nothing
 
   stop: (callback) =>
     @stopped = true
@@ -83,6 +84,7 @@ class FirehoseWorker
     @client.disconnect()
       .then callback
       .catch callback
+    return # nothing
 
   add: (subscriptionObj, callback) =>
     {

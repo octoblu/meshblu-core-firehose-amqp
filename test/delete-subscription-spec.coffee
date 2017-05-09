@@ -14,6 +14,7 @@ describe 'delete subscription', ->
         return done error if error?
         return done() if _.isEmpty keys
         rawClient.del keys..., done
+    return # nothing
 
   beforeEach ->
     @worker = new FirehoseWorker
@@ -38,6 +39,7 @@ describe 'delete subscription', ->
     @client.connect (error) =>
       return done error if error?
       @client.connectFirehose done
+    return # nothing
 
   beforeEach (done) ->
     @members = []

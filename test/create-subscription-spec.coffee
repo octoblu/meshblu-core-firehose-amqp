@@ -14,6 +14,7 @@ describe 'create subscription', ->
         return done error if error?
         return done() if _.isEmpty keys
         rawClient.del keys..., done
+    return # nothing
 
   beforeEach ->
     @worker = new FirehoseWorker
@@ -38,6 +39,7 @@ describe 'create subscription', ->
     @client.connect (error) =>
       return done error if error?
       @client.connectFirehose done
+    return # nothing
 
   it 'should insert the uuid into the subscription queue in redis', (done) ->
     @members = []
