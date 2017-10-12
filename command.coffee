@@ -5,9 +5,9 @@ class Command
   constructor: ->
     @options =
       amqpUri          : process.env.AMQP_URI
-      aliasServerUri   : process.env.ALIAS_SERVER_URI
+      aliasServerUri   : process.env.ALIAS_SERVER_URI || ''
       redisUri         : process.env.REDIS_URI
-      firehoseRedisUri : process.env.FIREHOSE_REDIS_URI
+      firehoseRedisUri : process.env.FIREHOSE_REDIS_URI || process.env.REDIS_URI
       namespace        : process.env.NAMESPACE || 'firehose:amqp'
       hydrantNamespace : process.env.HYDRANT_NAMESPACE || 'messages'
 
